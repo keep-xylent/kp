@@ -12,6 +12,7 @@ import {
   reorderGallery,
 } from '../api/projects';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api/categories';
+import { getSettings, updateSettings } from '../api/settings';
 import {
   FolderKanban,
   Tags,
@@ -29,6 +30,9 @@ import {
   X,
   Eye,
   Check,
+  Settings as SettingsIcon,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export default function AdminDashboard({ onExit }) {
@@ -37,6 +41,32 @@ export default function AdminDashboard({ onExit }) {
     const saved = localStorage.getItem('starcon_admin_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('color-theme') === 'dark' ||
+      (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('color-theme', 'light');
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('color-theme', 'dark');
+      setIsDarkMode(true);
+    }
+  };
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -49,6 +79,7 @@ export default function AdminDashboard({ onExit }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Project Form State
   const [projectFormOpen, setProjectFormOpen] = useState(false);
@@ -60,17 +91,30 @@ export default function AdminDashboard({ onExit }) {
   const [projectStatus, setProjectStatus] = useState('active');
   const [projectThumbnail, setProjectThumbnail] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState('');
+  const [projectThumbnailUrl, setProjectThumbnailUrl] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
   // Gallery Mode State
   const [activeGalleryProject, setActiveGalleryProject] = useState(null); // project object
   const [galleryItems, setGalleryItems] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [newGalleryImageUrl, setNewGalleryImageUrl] = useState('');
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
 
   // Category Management State
   const [categoryName, setCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState(null);
+
+  // Settings State
+  const [settingsData, setSettingsData] = useState({
+    stats_mode: 'auto',
+    stats_projects: '',
+    stats_years: '',
+    stats_clients: '',
+    stats_quality: ''
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
 
   // Autoload data on mount/tab change
   useEffect(() => {
@@ -83,13 +127,16 @@ export default function AdminDashboard({ onExit }) {
     setLoading(true);
     setError('');
     try {
-      const [projData, catData] = await Promise.all([
+      const [projData, catData, settings] = await Promise.all([
         getProjects({ status: 'all' }), // Fetch both active and draft
         getCategories(),
+        getSettings()
       ]);
       setProjects(projData || []);
       setCategories(catData || []);
+      if (settings) setSettingsData(settings);
     } catch (err) {
+      console.error("fetchData error:", err);
       setError(err.message || 'Gagal memuat data');
     } finally {
       setLoading(false);
@@ -130,6 +177,8 @@ export default function AdminDashboard({ onExit }) {
     setProjectStatus('active');
     setProjectThumbnail(null);
     setThumbnailPreview('');
+    setProjectThumbnailUrl('');
+    setProjectThumbnailUrl('');
     setProjectFormOpen(true);
   };
 
@@ -142,6 +191,8 @@ export default function AdminDashboard({ onExit }) {
     setProjectStatus(proj.status || 'active');
     setProjectThumbnail(null);
     setThumbnailPreview(proj.thumbnail || '');
+    setProjectThumbnailUrl((proj.thumbnail && proj.thumbnail.startsWith('http')) ? proj.thumbnail : '');
+    setProjectThumbnailUrl((proj.thumbnail && proj.thumbnail.startsWith('http')) ? proj.thumbnail : '');
     setProjectFormOpen(true);
   };
 
@@ -149,7 +200,7 @@ export default function AdminDashboard({ onExit }) {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File gambar terlalu besar (maksimal 5 MB)');
+        showError('File gambar terlalu besar (maksimal 5 MB)');
         return;
       }
       setProjectThumbnail(file);
@@ -160,7 +211,7 @@ export default function AdminDashboard({ onExit }) {
   const handleProjectSubmit = async (e) => {
     e.preventDefault();
     if (!projectTitle || !projectCategoryId) {
-      alert('Judul dan Kategori wajib diisi');
+      showError('Judul dan Kategori wajib diisi');
       return;
     }
 
@@ -174,6 +225,10 @@ export default function AdminDashboard({ onExit }) {
       formData.append('status', projectStatus);
       if (projectThumbnail) {
         formData.append('thumbnail', projectThumbnail);
+      } else if (projectThumbnailUrl) {
+        formData.append('thumbnail', projectThumbnailUrl);
+      } else if (projectThumbnailUrl) {
+        formData.append('thumbnail', projectThumbnailUrl);
       }
 
       if (editingProject) {
@@ -187,7 +242,7 @@ export default function AdminDashboard({ onExit }) {
       setProjectFormOpen(false);
       fetchData();
     } catch (err) {
-      alert(err.message || 'Gagal menyimpan proyek');
+      showError(err.message || 'Gagal menyimpan proyek');
     } finally {
       setFormLoading(false);
     }
@@ -200,7 +255,7 @@ export default function AdminDashboard({ onExit }) {
         showSuccess('Proyek berhasil dihapus');
         fetchData();
       } catch (err) {
-        alert(err.message || 'Gagal menghapus proyek');
+        showError(err.message || 'Gagal menghapus proyek');
       }
     }
   };
@@ -222,7 +277,7 @@ export default function AdminDashboard({ onExit }) {
       setEditingCategory(null);
       fetchData();
     } catch (err) {
-      alert(err.message || 'Gagal menyimpan kategori');
+      showError(err.message || 'Gagal menyimpan kategori');
     }
   };
 
@@ -233,12 +288,12 @@ export default function AdminDashboard({ onExit }) {
         showSuccess('Kategori berhasil dihapus');
         fetchData();
       } catch (err) {
-        alert(err.message || 'Gagal menghapus kategori');
+        showError(err.message || 'Gagal menghapus kategori');
       }
     }
   };
 
-  /* ── 4. Gallery Manager Handlers ── */
+  /* ── 5. Gallery Manager Handlers ── */
   const openGalleryManager = async (proj) => {
     setActiveGalleryProject(proj);
     setGalleryLoading(true);
@@ -246,7 +301,27 @@ export default function AdminDashboard({ onExit }) {
       const items = await getProjectGallery(proj.id);
       setGalleryItems(items || []);
     } catch (err) {
-      alert(err.message || 'Gagal memuat galeri');
+      showError(err.message || 'Gagal memuat galeri');
+    } finally {
+      setGalleryLoading(false);
+    }
+  };
+
+  const handleAddGalleryUrl = async () => {
+    if (!newGalleryImageUrl.trim()) return;
+    setGalleryLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image_url', newGalleryImageUrl.trim());
+
+      await uploadGallery(activeGalleryProject.id, formData);
+      showSuccess('URL gambar berhasil ditambahkan ke galeri');
+      setNewGalleryImageUrl('');
+      
+      const items = await getProjectGallery(activeGalleryProject.id);
+      setGalleryItems(items || []);
+    } catch (err) {
+      showError(err.message || 'Gagal menambahkan URL gambar');
     } finally {
       setGalleryLoading(false);
     }
@@ -270,7 +345,7 @@ export default function AdminDashboard({ onExit }) {
       const items = await getProjectGallery(activeGalleryProject.id);
       setGalleryItems(items || []);
     } catch (err) {
-      alert(err.message || 'Gagal mengunggah galeri');
+      showError(err.message || 'Gagal mengunggah galeri');
     } finally {
       setGalleryLoading(false);
     }
@@ -287,7 +362,7 @@ export default function AdminDashboard({ onExit }) {
         const items = await getProjectGallery(activeGalleryProject.id);
         setGalleryItems(items || []);
       } catch (err) {
-        alert(err.message || 'Gagal menghapus foto');
+        showError(err.message || 'Gagal menghapus foto');
       } finally {
         setGalleryLoading(false);
       }
@@ -307,7 +382,7 @@ export default function AdminDashboard({ onExit }) {
       const items = await getProjectGallery(activeGalleryProject.id);
       setGalleryItems(items || []);
     } catch (err) {
-      alert(err.message || 'Gagal memperbarui foto');
+      showError(err.message || 'Gagal memperbarui foto');
     }
   };
 
@@ -338,7 +413,22 @@ export default function AdminDashboard({ onExit }) {
       await reorderGallery(activeGalleryProject.id, orderedIds);
       showSuccess('Urutan foto berhasil disimpan');
     } catch (err) {
-      alert(err.message || 'Gagal menyimpan urutan galeri');
+      showError(err.message || 'Gagal menyimpan urutan galeri');
+    }
+  };
+
+  /* ── 6. Settings Handlers ── */
+  const handleSettingsSubmit = async (e) => {
+    e.preventDefault();
+    setSettingsLoading(true);
+    try {
+      const updated = await updateSettings(settingsData);
+      setSettingsData(updated);
+      showSuccess('Pengaturan berhasil disimpan');
+    } catch (err) {
+      showError(err.message || 'Gagal menyimpan pengaturan');
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -348,16 +438,21 @@ export default function AdminDashboard({ onExit }) {
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  const showError = (msg) => {
+    setErrorMsg(msg);
+    setTimeout(() => setErrorMsg(''), 3000);
+  };
+
   /* ────────────────────────────────────────────────────────
      AUTH INTERFACE (Login Form)
      ──────────────────────────────────────────────────────── */
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-800 rounded-2xl border border-slate-700 p-8 shadow-xl">
+      <div className="min-h-screen bg-white dark:bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-300 dark:border-slate-700 p-8 shadow-xl">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white tracking-tight">STARCON Dashboard</h2>
-            <p className="text-slate-400 text-sm mt-2">Log in untuk mengelola portofolio proyek</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">STARCON Dashboard</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">Log in untuk mengelola portofolio proyek</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -369,33 +464,33 @@ export default function AdminDashboard({ onExit }) {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Email</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@starcon.id"
                 required
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Password</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-2">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
               />
             </div>
 
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white font-semibold text-sm py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 mt-4"
+              className="w-full bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:bg-slate-900/50 dark:disabled:bg-white/50 text-white dark:text-slate-900 font-semibold text-sm py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 mt-4"
             >
               {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Log In'}
             </button>
@@ -403,7 +498,7 @@ export default function AdminDashboard({ onExit }) {
 
           <button
             onClick={onExit}
-            className="w-full mt-6 text-center text-xs font-medium text-slate-500 hover:text-slate-300 transition-colors"
+            className="w-full mt-6 text-center text-xs font-medium text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
             ← Kembali ke Website Utama
           </button>
@@ -416,21 +511,31 @@ export default function AdminDashboard({ onExit }) {
      MAIN ADMIN INTERFACE
      ──────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col overflow-hidden">
       {/* Top Header */}
-      <header className="h-16 border-b border-slate-800 bg-slate-900 px-6 flex items-center justify-between z-10">
+      <header className="h-16 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 flex items-center justify-between z-10 transition-colors">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-white tracking-tight">STARCON Admin</span>
-          <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
-            {user.role}
-          </span>
+          <div className="flex items-center space-x-2">
+            <img src="/images/logo_dark.png" alt="Logo" className="h-7 dark:hidden" />
+            <img src="/images/logo_light.png" alt="Logo" className="h-7 hidden dark:block" />
+            <span className="font-bold text-slate-900 dark:text-white tracking-tight">DASHBOARD</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-400">Halo, {user.name}</span>
+          <button
+            onClick={toggleDarkMode}
+            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+          
+          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+
+          <span className="text-sm text-slate-600 dark:text-slate-400 hidden sm:inline-block">Halo, Admin</span>
           <button
             onClick={handleLogout}
-            className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1.5 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-all"
+            className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 font-semibold flex items-center gap-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-all"
           >
             <LogOut className="w-3.5 h-3.5" /> Log Out
           </button>
@@ -440,7 +545,7 @@ export default function AdminDashboard({ onExit }) {
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-slate-800 bg-slate-900/50 p-4 space-y-2 flex-shrink-0">
+        <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4 space-y-2 flex-shrink-0 overflow-y-auto">
           <button
             onClick={() => {
               setActiveGalleryProject(null);
@@ -448,31 +553,31 @@ export default function AdminDashboard({ onExit }) {
             }}
             className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
               activeTab === 'projects' && !activeGalleryProject
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
             }`}
           >
-            <FolderKanban className="w-4 h-4" /> Kelola Proyek
+            <FolderKanban className="w-4 h-4" /> Kelola
           </button>
 
           <button
             onClick={() => {
               setActiveGalleryProject(null);
-              setActiveTab('categories');
+              setActiveTab('settings');
             }}
             className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'categories'
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              activeTab === 'settings'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
             }`}
           >
-            <Tags className="w-4 h-4" /> Kelola Kategori
+            <SettingsIcon className="w-4 h-4" /> Pengaturan
           </button>
 
-          <div className="pt-6 border-t border-slate-800 mt-6">
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-800 mt-6">
             <button
               onClick={onExit}
-              className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 hover:text-slate-300 transition-colors"
+              className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Kembali ke Web
             </button>
@@ -488,44 +593,68 @@ export default function AdminDashboard({ onExit }) {
               <span>{successMsg}</span>
             </div>
           )}
+          {errorMsg && (
+            <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white font-medium text-xs px-4 py-3 rounded-xl shadow-lg border border-red-500 flex items-center gap-2 animate-fade-in-up">
+              <AlertCircle className="w-4 h-4" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           {/* ──────────────────────────────────────────────────
              GALLERY MANAGER VIEW
              ────────────────────────────────────────────────── */}
           {activeGalleryProject ? (
             <div className="space-y-6">
-              {/* Back to Project list */}
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setActiveGalleryProject(null)}
-                  className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+                  className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" /> Kembali ke Daftar Proyek
                 </button>
               </div>
 
-              {/* Title & Upload Button */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
                 <div>
-                  <h2 className="text-xl font-bold text-white">{activeGalleryProject.title}</h2>
-                  <p className="text-xs text-slate-400 mt-1">Kelola foto-foto galeri dan seret-geser untuk merubah urutan tampil</p>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">{activeGalleryProject.title}</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Kelola foto-foto galeri dan seret-geser untuk merubah urutan tampil</p>
                 </div>
 
-                <div className="relative">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    id="gallery-input"
-                    onChange={handleGalleryUpload}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="gallery-input"
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 shadow-lg transition-colors"
-                  >
-                    <Upload className="w-4 h-4" /> Upload Foto Galeri
-                  </label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="flex bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm focus-within:border-slate-400 dark:focus-within:border-slate-500 transition-colors">
+                    <input
+                      type="text"
+                      placeholder="Tempel URL gambar..."
+                      value={newGalleryImageUrl}
+                      onChange={(e) => setNewGalleryImageUrl(e.target.value)}
+                      className="px-4 py-2 text-sm bg-transparent border-none focus:outline-none w-48 sm:w-64 text-slate-900 dark:text-white"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddGalleryUrl(); }}
+                    />
+                    <button
+                      onClick={handleAddGalleryUrl}
+                      disabled={!newGalleryImageUrl.trim()}
+                      className="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-300 px-4 py-2 text-sm font-semibold transition-colors border-l border-slate-200 dark:border-slate-800 flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> URL
+                    </button>
+                  </div>
+                  <span className="text-slate-400 text-xs font-semibold px-1">ATAU</span>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      id="gallery-input"
+                      onChange={handleGalleryUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="gallery-input"
+                      className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm px-5 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 shadow-lg transition-colors whitespace-nowrap"
+                    >
+                      <Upload className="w-4 h-4" /> Upload Foto
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -538,7 +667,7 @@ export default function AdminDashboard({ onExit }) {
               ) : (
                 <>
                   {galleryItems.length === 0 ? (
-                    <div className="flex flex-col items-center py-20 text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                    <div className="flex flex-col items-center py-20 text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
                       <ImageIcon className="w-12 h-12 text-slate-600 mb-2" strokeWidth={1} />
                       <p className="text-sm">Belum ada foto galeri untuk proyek ini</p>
                     </div>
@@ -551,16 +680,16 @@ export default function AdminDashboard({ onExit }) {
                           onDragStart={() => handleDragStart(idx)}
                           onDragOver={(e) => handleDragOver(e, idx)}
                           onDrop={(e) => handleDrop(e, idx)}
-                          className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col group cursor-move hover:border-slate-700 transition-all"
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col group cursor-move hover:border-slate-300 dark:hover:border-slate-700 transition-all"
                         >
                           {/* Image Thumbnail */}
-                          <div className="relative aspect-video bg-slate-950 overflow-hidden">
+                          <div className="relative aspect-video bg-slate-50 dark:bg-slate-950 overflow-hidden">
                             <img
                               src={item.image_url || item.image}
                               alt={item.title || 'Foto proyek'}
                               className="w-full h-full object-cover"
                             />
-                            <div className="absolute top-2 left-2 bg-slate-950/80 px-2 py-0.5 rounded text-xxs text-slate-400 font-semibold uppercase tracking-wider">
+                            <div className="absolute top-2 left-2 bg-slate-50 dark:bg-slate-950/80 px-2 py-0.5 rounded text-xxs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                               Order: {item.sort_order || idx + 1}
                             </div>
                           </div>
@@ -574,7 +703,7 @@ export default function AdminDashboard({ onExit }) {
                                 defaultValue={item.title || ''}
                                 onBlur={(e) => handleGalleryItemUpdate(item.id, { title: e.target.value })}
                                 placeholder="Tulis judul gambar..."
-                                className="w-full bg-slate-950 border border-slate-800 text-xs text-white px-3 py-2 rounded focus:outline-none focus:border-blue-500"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white px-3 py-2 rounded focus:outline-none focus:border-slate-900 dark:focus:border-white"
                               />
                             </div>
 
@@ -585,13 +714,13 @@ export default function AdminDashboard({ onExit }) {
                                 defaultValue={item.description || ''}
                                 onBlur={(e) => handleGalleryItemUpdate(item.id, { description: e.target.value })}
                                 placeholder="Tulis deskripsi gambar..."
-                                className="w-full bg-slate-950 border border-slate-800 text-xs text-white px-3 py-2 rounded focus:outline-none focus:border-blue-500 resize-none"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white px-3 py-2 rounded focus:outline-none focus:border-slate-900 dark:focus:border-white resize-none"
                               />
                             </div>
                           </div>
 
                           {/* Delete bar */}
-                          <div className="h-10 border-t border-slate-800 bg-slate-900/60 flex items-center justify-end px-3">
+                          <div className="h-10 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-end px-3">
                             <button
                               onClick={() => handleGalleryItemDelete(item.id)}
                               className="text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
@@ -612,21 +741,29 @@ export default function AdminDashboard({ onExit }) {
                  PROJECTS TAB VIEW
                  ────────────────────────────────────────────────── */}
               {activeTab === 'projects' && (
-                <div className="space-y-6">
+                <div className="space-y-12">
+                  <div className="space-y-6">
                   {/* Tab Title */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-5">
                     <div>
-                      <h2 className="text-xl font-bold text-white">Kelola Proyek</h2>
-                      <p className="text-xs text-slate-400 mt-1">Daftar portofolio proyek konstruksi dan bangunan</p>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Kelola Proyek</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Daftar portofolio proyek konstruksi dan bangunan</p>
                     </div>
 
                     <button
                       onClick={openCreateProject}
-                      className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-colors"
+                      className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition-colors"
                     >
                       <Plus className="w-4 h-4" /> Tambah Proyek
                     </button>
                   </div>
+                  
+                  {error && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {error}
+                    </div>
+                  )}
 
                   {/* List loader */}
                   {loading ? (
@@ -635,10 +772,10 @@ export default function AdminDashboard({ onExit }) {
                       <p className="text-xs font-medium mt-2">Menyinkronkan data proyek…</p>
                     </div>
                   ) : (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl">
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-800 text-xs text-slate-400 font-semibold bg-slate-900/50">
+                          <tr className="border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900/50">
                             <th className="p-4 pl-6">Proyek</th>
                             <th className="p-4">Kategori</th>
                             <th className="p-4">Lokasi</th>
@@ -646,7 +783,7 @@ export default function AdminDashboard({ onExit }) {
                             <th className="p-4 pr-6 text-right">Aksi</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800 text-sm">
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
                           {projects.length === 0 ? (
                             <tr>
                               <td colSpan="5" className="p-8 text-center text-slate-500">
@@ -655,10 +792,10 @@ export default function AdminDashboard({ onExit }) {
                             </tr>
                           ) : (
                             projects.map((proj) => (
-                              <tr key={proj.id} className="hover:bg-slate-800/20">
+                              <tr key={proj.id} className="hover:bg-slate-100 dark:hover:bg-slate-800/20">
                                 <td className="p-4 pl-6">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-lg bg-slate-950 overflow-hidden flex-shrink-0">
+                                    <div className="w-12 h-12 rounded-lg bg-slate-50 dark:bg-slate-950 overflow-hidden flex-shrink-0">
                                       {proj.thumbnail ? (
                                         <img
                                           src={proj.thumbnail}
@@ -671,27 +808,27 @@ export default function AdminDashboard({ onExit }) {
                                         </div>
                                       )}
                                     </div>
-                                    <span className="font-semibold text-white truncate max-w-xs">{proj.title}</span>
+                                    <span className="font-semibold text-slate-900 dark:text-white truncate max-w-xs">{proj.title}</span>
                                   </div>
                                 </td>
-                                <td className="p-4 text-slate-400">{proj.category_name || '-'}</td>
-                                <td className="p-4 text-slate-400">{proj.address || '-'}</td>
+                                <td className="p-4 text-slate-500 dark:text-slate-400">{proj.category_name || '-'}</td>
+                                <td className="p-4 text-slate-500 dark:text-slate-400">{proj.address || '-'}</td>
                                 <td className="p-4">
                                   <span
-                                    className={`inline-flex px-2 py-0.5 rounded text-xxs font-bold uppercase tracking-wide ${
+                                    className={`inline-flex text-xs font-semibold ${
                                       proj.status === 'active'
-                                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                        : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-orange-600 dark:text-orange-400'
                                     }`}
                                   >
-                                    {proj.status}
+                                    {proj.status === 'active' ? 'Publish' : 'Draft'}
                                   </span>
                                 </td>
                                 <td className="p-4 pr-6 text-right">
                                   <div className="inline-flex items-center gap-2">
                                     <button
                                       onClick={() => openGalleryManager(proj)}
-                                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 hover:bg-blue-500/10 px-2 py-1.5 rounded transition-all"
+                                      className="text-xs text-slate-600 dark:text-slate-300 hover:text-blue-300 font-semibold flex items-center gap-1 hover:bg-blue-500/10 px-2 py-1.5 rounded transition-all"
                                       title="Kelola Galeri Foto"
                                     >
                                       <ImageIcon className="w-3.5 h-3.5" /> Galeri
@@ -699,7 +836,7 @@ export default function AdminDashboard({ onExit }) {
 
                                     <button
                                       onClick={() => openEditProject(proj)}
-                                      className="text-xs text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1 hover:bg-slate-800 px-2 py-1.5 rounded transition-all"
+                                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-semibold flex items-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 px-2 py-1.5 rounded transition-all"
                                       title="Edit Detail Proyek"
                                     >
                                       <Edit2 className="w-3.5 h-3.5" /> Edit
@@ -722,44 +859,42 @@ export default function AdminDashboard({ onExit }) {
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* ──────────────────────────────────────────────────
-                 CATEGORIES TAB VIEW
-                 ────────────────────────────────────────────────── */}
-              {activeTab === 'categories' && (
-                <div className="space-y-6">
+                {/* ──────────────────────────────────────────────────
+                   CATEGORIES SECTION
+                   ────────────────────────────────────────────────── */}
+                <div className="space-y-6 pt-4">
                   {/* Tab Title */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-5">
                     <div>
-                      <h2 className="text-xl font-bold text-white">Kelola Kategori</h2>
-                      <p className="text-xs text-slate-400 mt-1">Klasifikasi kategori proyek portofolio</p>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Kelola Kategori</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Klasifikasi kategori proyek portofolio</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Add/Edit form */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-fit space-y-4">
-                      <h3 className="font-semibold text-white text-base">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 h-fit space-y-4">
+                      <h3 className="font-semibold text-slate-900 dark:text-white text-base">
                         {editingCategory ? 'Edit Kategori' : 'Kategori Baru'}
                       </h3>
                       <form onSubmit={handleCategorySubmit} className="space-y-4">
                         <div>
-                          <label className="block text-xs text-slate-400 font-medium mb-2">Nama Kategori</label>
+                          <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Nama Kategori</label>
                           <input
                             type="text"
                             value={categoryName}
                             onChange={(e) => setCategoryName(e.target.value)}
                             placeholder="Contoh: Rumah Tinggal"
                             required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                           />
                         </div>
 
                         <div className="flex gap-2">
                           <button
                             type="submit"
-                            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors flex-1"
+                            className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors flex-1"
                           >
                             {editingCategory ? 'Simpan Perubahan' : 'Tambah'}
                           </button>
@@ -770,7 +905,7 @@ export default function AdminDashboard({ onExit }) {
                                 setEditingCategory(null);
                                 setCategoryName('');
                               }}
-                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors"
+                              className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors"
                             >
                               Batal
                             </button>
@@ -780,16 +915,16 @@ export default function AdminDashboard({ onExit }) {
                     </div>
 
                     {/* Categories list */}
-                    <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl">
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-800 text-xs text-slate-400 font-semibold bg-slate-900/50">
+                          <tr className="border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900/50">
                             <th className="p-4 pl-6">Kategori</th>
                             <th className="p-4">Slug</th>
                             <th className="p-4 pr-6 text-right">Aksi</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800 text-sm text-slate-300">
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm text-slate-600 dark:text-slate-300">
                           {categories.length === 0 ? (
                             <tr>
                               <td colSpan="3" className="p-8 text-center text-slate-500">
@@ -798,9 +933,9 @@ export default function AdminDashboard({ onExit }) {
                             </tr>
                           ) : (
                             categories.map((cat) => (
-                              <tr key={cat.id} className="hover:bg-slate-800/20">
-                                <td className="p-4 pl-6 font-medium text-white">{cat.name}</td>
-                                <td className="p-4 text-slate-400">{cat.slug}</td>
+                              <tr key={cat.id} className="hover:bg-slate-100 dark:hover:bg-slate-800/20">
+                                <td className="p-4 pl-6 font-medium text-slate-900 dark:text-white">{cat.name}</td>
+                                <td className="p-4 text-slate-500 dark:text-slate-400">{cat.slug}</td>
                                 <td className="p-4 pr-6 text-right">
                                   <div className="inline-flex items-center gap-2">
                                     <button
@@ -808,7 +943,7 @@ export default function AdminDashboard({ onExit }) {
                                         setEditingCategory(cat);
                                         setCategoryName(cat.name);
                                       }}
-                                      className="text-xs text-slate-400 hover:text-white font-semibold hover:bg-slate-800 px-2.5 py-1.5 rounded transition-all"
+                                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 px-2.5 py-1.5 rounded transition-all"
                                     >
                                       Edit
                                     </button>
@@ -828,7 +963,162 @@ export default function AdminDashboard({ onExit }) {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+              {/* ──────────────────────────────────────────────────
+                 SETTINGS TAB VIEW
+                 ────────────────────────────────────────────────── */}
+              {activeTab === 'settings' && (
+                <div className="space-y-6">
+                  {/* Tab Title */}
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-5">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Pengaturan Website</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Konfigurasi statistik beranda dan preferensi website</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 md:p-8 w-full">
+                    
+                    <form onSubmit={handleSettingsSubmit} className="space-y-8">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        
+                        {/* Section: Nilai Statistik (Compact) */}
+                        <div className="space-y-5 bg-white dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            Nilai Statistik
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="col-span-2">
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Proyek Selesai</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={settingsData.stats_projects || ''}
+                                  onChange={(e) => setSettingsData({...settingsData, stats_projects: e.target.value})}
+                                  disabled={settingsData.stats_mode === 'auto'}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                                />
+                                <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={settingsData.stats_mode === 'auto'}
+                                    onChange={(e) => setSettingsData({...settingsData, stats_mode: e.target.checked ? 'auto' : 'manual'})}
+                                    className="w-3.5 h-3.5 accent-slate-900 dark:accent-slate-100"
+                                  />
+                                  <span className="text-xxs text-slate-500 font-medium whitespace-nowrap">Auto (DB)</span>
+                                </label>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Pengalaman (Th)</label>
+                              <input
+                                type="number"
+                                value={settingsData.stats_years || ''}
+                                onChange={(e) => setSettingsData({...settingsData, stats_years: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Klien Puas</label>
+                              <input
+                                type="number"
+                                value={settingsData.stats_clients || ''}
+                                onChange={(e) => setSettingsData({...settingsData, stats_clients: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                              />
+                            </div>
+
+                            <div className="col-span-2">
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Komitmen Kualitas (%)</label>
+                              <input
+                                type="number"
+                                value={settingsData.stats_quality || ''}
+                                onChange={(e) => setSettingsData({...settingsData, stats_quality: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section: Info Personal */}
+                        <div className="space-y-5 bg-white dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 h-full">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            Info Personal
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Nomor WhatsApp</label>
+                              <input
+                                type="text"
+                                placeholder="+628123456789"
+                                value={settingsData.contact_wa || ''}
+                                onChange={(e) => setSettingsData({...settingsData, contact_wa: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 transition-colors"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Telepon Kantor</label>
+                              <input
+                                type="text"
+                                placeholder="(021) 555-8899"
+                                value={settingsData.contact_phone || ''}
+                                onChange={(e) => setSettingsData({...settingsData, contact_phone: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 transition-colors"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Alamat Email</label>
+                              <input
+                                type="email"
+                                placeholder="hello@example.com"
+                                value={settingsData.contact_email || ''}
+                                onChange={(e) => setSettingsData({...settingsData, contact_email: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 transition-colors"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Username Instagram</label>
+                              <input
+                                type="text"
+                                placeholder="@username_ig"
+                                value={settingsData.contact_ig || ''}
+                                onChange={(e) => setSettingsData({...settingsData, contact_ig: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 transition-colors"
+                              />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1.5">Alamat Kantor</label>
+                              <textarea
+                                rows="3"
+                                placeholder="Alamat lengkap..."
+                                value={settingsData.contact_address || ''}
+                                onChange={(e) => setSettingsData({...settingsData, contact_address: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 transition-colors resize-none"
+                              ></textarea>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                      <div className="pt-4 flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={settingsLoading}
+                          className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:bg-slate-900/50 dark:disabled:bg-white/50 text-white dark:text-slate-900 font-semibold text-sm px-6 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          {settingsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Simpan Pengaturan'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               )}
+
+
             </>
           )}
         </main>
@@ -843,15 +1133,15 @@ export default function AdminDashboard({ onExit }) {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setProjectFormOpen(false)} />
 
           {/* Form Modal Box */}
-          <div className="relative z-10 w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="relative z-10 w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 {editingProject ? 'Edit Detail Proyek' : 'Tambah Proyek Baru'}
               </h3>
               <button
                 onClick={() => setProjectFormOpen(false)}
-                className="text-slate-400 hover:text-white rounded-lg p-1 hover:bg-slate-800 transition-all"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -860,25 +1150,25 @@ export default function AdminDashboard({ onExit }) {
             {/* Modal Body (Scrollable Form) */}
             <form onSubmit={handleProjectSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Judul Proyek</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Judul Proyek</label>
                 <input
                   type="text"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   placeholder="Contoh: Gedung Kantor Bupati Utama"
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Kategori</label>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Kategori</label>
                   <select
                     value={projectCategoryId}
                     onChange={(e) => setProjectCategoryId(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -889,12 +1179,12 @@ export default function AdminDashboard({ onExit }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Status Publikasi</label>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Status Publikasi</label>
                   <select
                     value={projectStatus}
                     onChange={(e) => setProjectStatus(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                   >
                     <option value="active">Aktif (Tampil di Portfolio)</option>
                     <option value="draft">Draft (Disembunyikan)</option>
@@ -903,69 +1193,85 @@ export default function AdminDashboard({ onExit }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Alamat / Lokasi Proyek</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Alamat / Lokasi Proyek</label>
                 <input
                   type="text"
                   value={projectAddress}
                   onChange={(e) => setProjectAddress(e.target.value)}
                   placeholder="Contoh: Surabaya, Jawa Timur"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Deskripsi Proyek</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Deskripsi Proyek</label>
                 <textarea
                   rows="4"
                   value={projectDescription}
                   onChange={(e) => setProjectDescription(e.target.value)}
                   placeholder="Jelaskan detail proyek, material yang digunakan, tantangan, dll..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Thumbnail Proyek</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Thumbnail Proyek</label>
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  <div className="w-28 h-28 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 flex-shrink-0 flex items-center justify-center">
+                  <div className="w-28 h-28 rounded-xl bg-slate-50 dark:bg-slate-950 overflow-hidden border border-slate-200 dark:border-slate-800 flex-shrink-0 flex items-center justify-center">
                     {thumbnailPreview ? (
                       <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <ImageIcon className="w-8 h-8 text-slate-700" />
                     )}
                   </div>
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-3 w-full">
                     <input
-                      type="file"
-                      accept="image/*"
-                      id="thumbnail-file"
-                      onChange={handleThumbnailChange}
-                      className="hidden"
+                      type="text"
+                      placeholder="Tempel URL gambar online di sini..."
+                      value={projectThumbnailUrl}
+                      onChange={(e) => {
+                        setProjectThumbnailUrl(e.target.value);
+                        setThumbnailPreview(e.target.value);
+                        setProjectThumbnail(null);
+                      }}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-white"
                     />
-                    <label
-                      htmlFor="thumbnail-file"
-                      className="inline-flex bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors"
-                    >
-                      Pilih Foto Baru
-                    </label>
-                    <p className="text-xxs text-slate-500">Maksimal 5 MB. Format: JPG, PNG, WEBP</p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-500 font-medium">ATAU</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="thumbnail-file"
+                        onChange={(e) => {
+                          handleThumbnailChange(e);
+                          setProjectThumbnailUrl('');
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="thumbnail-file"
+                        className="inline-flex bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-200 font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors"
+                      >
+                        Pilih File Lokal
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Modal Footer */}
-              <div className="border-t border-slate-800 pt-5 flex justify-end gap-3 mt-6">
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-5 flex justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => setProjectFormOpen(false)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs px-5 py-3 rounded-xl transition-colors"
+                  className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs px-5 py-3 rounded-xl transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-5 py-3 rounded-xl shadow-lg transition-colors flex items-center gap-2"
+                  className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs px-5 py-3 rounded-xl shadow-lg transition-colors flex items-center gap-2"
                 >
                   {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editingProject ? 'Simpan Perubahan' : 'Tambah Proyek'}

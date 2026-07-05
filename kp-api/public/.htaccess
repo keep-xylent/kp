@@ -1,6 +1,6 @@
 Options -MultiViews
 RewriteEngine On
-RewriteBase /kp-api/public/
+RewriteBase /kp/kp-api/public/
 
 # Allow direct access to existing files and directories
 RewriteCond %{REQUEST_FILENAME} !-f

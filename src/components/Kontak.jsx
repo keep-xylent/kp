@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Phone, Mail, CheckCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -12,7 +12,21 @@ const customMarkerIcon = new L.divIcon({
   iconAnchor: [7, 7],
 });
 
-export default function Kontak() {
+export default function Kontak({ settings, initialCategory }) {
+  const [category, setCategory] = useState('');
+
+  useEffect(() => {
+    if (initialCategory) {
+      setCategory(initialCategory);
+    }
+  }, [initialCategory]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Handle form submission
+    console.log('Form submitted');
+  };
+
   return (
     <section id="kontak" className="py-20 lg:py-28 border-t border-slate-200 dark:border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -25,60 +39,12 @@ export default function Kontak() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-          {/* Left Column — Contact Info */}
-          <div className="lg:col-span-5 space-y-6 reveal-left">
-            <div>
-              <h4 className="font-heading font-bold text-xl text-slate-900 dark:text-white mb-2">Informasi Kantor</h4>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                Hubungi kantor representatif kami atau kunjungi alamat kami untuk berdiskusi langsung mengenai RAB, desain perencanaan sipil, atau tender proyek.
-              </p>
-            </div>
-
-            {/* Contact Cards */}
-            <div className="space-y-3">
-              <div className="flex items-start space-x-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="bg-blue-800/10 dark:bg-blue-400/10 text-blue-800 dark:text-blue-400 p-2.5 rounded-lg flex-shrink-0">
-                  <MapPin className="h-5 w-5" strokeWidth={2} />
-                </div>
-                <div>
-                  <h5 className="font-semibold text-slate-900 dark:text-white text-sm">Alamat Kantor</h5>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    Griya Permata Gedangan Blok I3 No.9 Gedangan, Kabupaten Sidoarjo, Jawa Timur - 61254, Indonesia
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="bg-blue-800/10 dark:bg-blue-400/10 text-blue-800 dark:text-blue-400 p-2.5 rounded-lg flex-shrink-0">
-                  <Phone className="h-5 w-5" strokeWidth={2} />
-                </div>
-                <div>
-                  <h5 className="font-semibold text-slate-900 dark:text-white text-sm">Telepon & WhatsApp</h5>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Telepon: (021) 555-8899 <br />
-                    WhatsApp: +62 812-3456-7890
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <div className="bg-blue-800/10 dark:bg-blue-400/10 text-blue-800 dark:text-blue-400 p-2.5 rounded-lg flex-shrink-0">
-                  <Mail className="h-5 w-5" strokeWidth={2} />
-                </div>
-                <div>
-                  <h5 className="font-semibold text-slate-900 dark:text-white text-sm">E-mail Resmi</h5>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    info@starconsejahtera.co.id <br />
-                    tender@starconsejahtera.co.id
-                  </p>
-                </div>
-              </div>
-            </div>
-
+          {/* Left Column — Map */}
+          <div className="lg:col-span-5 reveal-left h-full flex flex-col">
             {/* Map */}
-            <div className="h-56 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative bg-slate-100 dark:bg-slate-900">
+            <div className="flex-grow w-full min-h-[400px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative bg-slate-100 dark:bg-slate-900 shadow-sm">
               <MapContainer 
-                center={[-7.4235029, 112.7225139]} 
+                center={[-7.385345, 112.717253]} 
                 zoom={14} 
                 scrollWheelZoom={false}
                 zoomControl={false}
@@ -89,7 +55,7 @@ export default function Kontak() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                <Marker position={[-7.4235029, 112.7225139]} icon={customMarkerIcon}>
+                <Marker position={[-7.385345, 112.717253]} icon={customMarkerIcon}>
                   <Popup>
                     <div className="text-center font-sans">
                       <strong className="text-slate-900 block mb-1">Griya Permata Gedangan</strong>
@@ -99,11 +65,17 @@ export default function Kontak() {
                 </Marker>
               </MapContainer>
               
-              {/* Floating Location Label */}
-              <div className="absolute top-3 left-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm px-3 py-2 rounded-lg border border-slate-200/50 dark:border-slate-700/50 flex items-center space-x-2 pointer-events-none" style={{ zIndex: 10 }}>
+              {/* Floating Location Label (Clickable) */}
+              <a 
+                href="https://maps.google.com/?q=-7.385345,112.717253" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="absolute top-3 left-3 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-sm px-3 py-2 rounded-lg border border-slate-200/50 dark:border-slate-700/50 flex items-center space-x-2 transition-colors cursor-pointer shadow-sm" 
+                style={{ zIndex: 10 }}
+              >
                 <MapPin className="w-3.5 h-3.5 text-blue-800 dark:text-blue-400" strokeWidth={2.5} />
                 <span className="font-semibold text-xs text-slate-900 dark:text-white">Griya Permata Gedangan</span>
-              </div>
+              </a>
             </div>
           </div>
 
@@ -142,7 +114,12 @@ export default function Kontak() {
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="form-subject" className="text-xs font-medium text-slate-500 dark:text-slate-400">Kategori Layanan *</label>
-                  <select id="form-subject" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-800/20 focus:border-blue-800 dark:focus:ring-blue-400/20 dark:focus:border-blue-400 transition-all">
+                  <select 
+                    id="form-subject" 
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-800/20 focus:border-blue-800 dark:focus:ring-blue-400/20 dark:focus:border-blue-400 transition-all"
+                  >
                     <option value="">Pilih kategori</option>
                     <option value="gedung">Konstruksi Gedung / Kantor</option>
                     <option value="jalan">Pekerjaan Jalan / Beton</option>

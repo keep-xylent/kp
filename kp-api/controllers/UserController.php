@@ -41,4 +41,51 @@ class UserController {
         unset($user['password']); // remove hash before returning
         Response::success($user, 'Login berhasil');
     }
+    /** POST /api/users */
+    public function create(): void {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        if (empty($body['name']) || empty($body['email']) || empty($body['password'])) {
+            Response::error('Nama, email, dan password wajib diisi', 422);
+        }
+
+        // Check email exists
+        if ($this->model->findByEmail($body['email'])) {
+            Response::error('Email sudah terdaftar', 422);
+        }
+
+        $id = $this->model->create($body);
+        $user = $this->model->findById($id);
+        Response::success($user, 'User berhasil dibuat', 201);
+    }
+
+    /** PUT /api/users/{id} */
+    public function update(int $id): void {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $existing = $this->model->findById($id);
+        if (!$existing) Response::notFound('User tidak ditemukan');
+
+        if (empty($body['name']) || empty($body['email'])) {
+            Response::error('Nama dan email wajib diisi', 422);
+        }
+
+        // Check email if changed
+        if ($body['email'] !== $existing['email']) {
+            if ($this->model->findByEmail($body['email'])) {
+                Response::error('Email sudah terdaftar', 422);
+            }
+        }
+
+        $this->model->update($id, $body);
+        $updated = $this->model->findById($id);
+        Response::success($updated, 'User berhasil diperbarui');
+    }
+
+    /** DELETE /api/users/{id} */
+    public function delete(int $id): void {
+        $existing = $this->model->findById($id);
+        if (!$existing) Response::notFound('User tidak ditemukan');
+        
+        $this->model->delete($id);
+        Response::success(null, 'User berhasil dihapus');
+    }
 }

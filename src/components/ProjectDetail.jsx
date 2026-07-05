@@ -178,7 +178,10 @@ export default function ProjectDetail({ projectId, onBack }) {
 
               <a
                 href="#kontak"
-                onClick={onBack}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onBack('kontak', project.category);
+                }}
                 className="block w-full text-center bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm px-5 py-3 rounded-xl transition-colors"
               >
                 Konsultasi Proyek Ini

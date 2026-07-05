@@ -30,4 +30,47 @@ class User {
         $stmt->execute([$email]);
         return $stmt->fetch();
     }
+    public function create(array $data): int {
+        $stmt = $this->db->prepare(
+            "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)"
+        );
+        $stmt->execute([
+            $data['name'],
+            $data['email'],
+            password_hash($data['password'], PASSWORD_DEFAULT),
+            $data['role'] ?? 'admin'
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function update(int $id, array $data): bool {
+        // If password is provided, update it too
+        if (!empty($data['password'])) {
+            $stmt = $this->db->prepare(
+                "UPDATE users SET name = ?, email = ?, password = ?, role = ? WHERE id = ?"
+            );
+            return $stmt->execute([
+                $data['name'],
+                $data['email'],
+                password_hash($data['password'], PASSWORD_DEFAULT),
+                $data['role'] ?? 'admin',
+                $id
+            ]);
+        } else {
+            $stmt = $this->db->prepare(
+                "UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?"
+            );
+            return $stmt->execute([
+                $data['name'],
+                $data['email'],
+                $data['role'] ?? 'admin',
+                $id
+            ]);
+        }
+    }
+
+    public function delete(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM users WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
 }
