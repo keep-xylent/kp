@@ -1,32 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import './index.css';
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import Tentang from './components/Tentang';
-import Layanan from './components/Layanan';
-import Statistics from './components/Statistics';
-import Portofolio from './components/Portofolio';
-import Sertifikasi from './components/Sertifikasi';
-import Kontak from './components/Kontak';
-import Footer from './components/Footer';
-import ProjectDetail from './components/ProjectDetail';
-import AdminDashboard from './components/AdminDashboard';
+import Navbar from './components/layout/Navbar';
+import Hero from './components/sections/Hero';
+import Tentang from './components/sections/Tentang';
+import Layanan from './components/sections/Layanan';
+import Statistics from './components/sections/Statistics';
+import Portofolio from './components/sections/Portofolio';
+import Sertifikasi from './components/sections/Sertifikasi';
+import Kontak from './components/sections/Kontak';
+import Footer from './components/layout/Footer';
+import ProjectDetail from './pages/ProjectDetail';
+import AdminDashboard from './pages/AdminDashboard';
+import { getSettings } from './api/settings';
 
 function App() {
   // null = show main site; number = show project detail for that ID
   const [activeProjectId, setActiveProjectId] = useState(null);
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(() => window.location.pathname === '/admin');
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await getSettings();
+        setSettings(data);
+      } catch (err) {
+        console.error('Failed to fetch settings:', err);
+      }
+    };
+    fetchSettings();
+  }, [isAdminMode]);
 
   const handleViewDetail = (id) => {
     setActiveProjectId(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleBackToPortfolio = () => {
+  const [contactCategory, setContactCategory] = useState("");
+
+  const handleBackToPortfolio = (targetSection = 'portofolio', category = null) => {
     setActiveProjectId(null);
-    // Scroll to portfolio section after returning
+    if (category) {
+      setContactCategory(category);
+    }
+    // Scroll to section after returning
     setTimeout(() => {
-      document.getElementById('portofolio')?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById(targetSection)?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
 
@@ -67,15 +86,20 @@ function App() {
     }, 100);
 
     return () => observer.disconnect();
-  }, []);
+  }, [isAdminMode]);
+
+  const handleExitAdmin = () => {
+    setIsAdminMode(false);
+    window.history.pushState({}, '', '/');
+  };
 
   if (isAdminMode) {
-    return <AdminDashboard onExit={() => setIsAdminMode(false)} />;
+    return <AdminDashboard onExit={handleExitAdmin} />;
   }
 
   return (
     <div className="bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-300 min-h-screen">
-      <Navbar onAdminClick={() => setIsAdminMode(true)} />
+      <Navbar settings={settings} />
 
       {/* Detail View */}
       {activeProjectId !== null && (
@@ -93,10 +117,10 @@ function App() {
         <Statistics />
         <Portofolio onViewDetail={handleViewDetail} />
         <Sertifikasi />
-        <Kontak />
+        <Kontak settings={settings} initialCategory={contactCategory} />
       </div>
 
-      <Footer />
+      <Footer settings={settings} />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Menu, X } from 'lucide-react';
 
-export default function Navbar({ onAdminClick }) {
+export default function Navbar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [adminUser, setAdminUser] = useState(null);
 
   useEffect(() => {
     if (
@@ -15,6 +16,13 @@ export default function Navbar({ onAdminClick }) {
     } else {
       document.documentElement.classList.remove('dark');
       setIsDarkMode(false);
+    }
+
+    const savedUser = localStorage.getItem('starcon_admin_user');
+    if (savedUser) {
+      try {
+        setAdminUser(JSON.parse(savedUser));
+      } catch (e) {}
     }
   }, []);
 
@@ -64,12 +72,11 @@ export default function Navbar({ onAdminClick }) {
               {isDarkMode ? <Sun className="w-[18px] h-[18px]" strokeWidth={2} /> : <Moon className="w-[18px] h-[18px]" strokeWidth={2} />}
             </button>
             
-            <button
-              onClick={onAdminClick}
-              className="text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
-            >
-              Admin Panel
-            </button>
+            {adminUser && (
+              <a href="/admin" className="text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
+                Admin Panel
+              </a>
+            )}
 
             <a href="#kontak" className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
               Hubungi Kami
@@ -99,15 +106,13 @@ export default function Navbar({ onAdminClick }) {
               {link.label}
             </a>
           ))}
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onAdminClick && onAdminClick();
-            }}
-            className="block w-full text-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 py-2.5 rounded-lg text-sm font-medium"
-          >
-            Admin Panel
-          </button>
+
+          {adminUser && (
+            <a href="/admin" className="block w-full text-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 py-2.5 rounded-lg text-sm font-medium">
+              Admin Panel
+            </a>
+          )}
+
           <a href="#kontak" onClick={() => setIsMobileMenuOpen(false)} className="block mx-1 mt-2 text-center bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold py-2.5 rounded-lg text-sm">
             Hubungi Kami
           </a>

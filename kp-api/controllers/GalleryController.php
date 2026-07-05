@@ -25,31 +25,31 @@ class GalleryController {
         $project = $this->projectModel->findById($projectId, false);
         if (!$project) Response::notFound('Proyek tidak ditemukan');
 
-        if (empty($_FILES)) {
-            Response::error('Tidak ada file yang diunggah', 422);
+        if (empty($_FILES) && empty($_POST['image_url'])) {
+            Response::error('Tidak ada file atau URL gambar yang diberikan', 422);
         }
 
         $created = [];
         $errors  = [];
+        $maxOrder = $this->model->maxOrder($projectId);
 
-        // Support single or multiple file inputs: images[] or image
+        // 1. Support single or multiple file inputs: images[] or image
         $files = [];
-        if (!empty($_FILES['images']['name'])) {
-            // Multiple: images[]
+        if (!empty($_FILES['images']['name']) && is_array($_FILES['images']['name'])) {
             foreach ($_FILES['images']['name'] as $i => $name) {
-                $files[] = [
-                    'name'     => $name,
-                    'type'     => $_FILES['images']['type'][$i],
-                    'tmp_name' => $_FILES['images']['tmp_name'][$i],
-                    'error'    => $_FILES['images']['error'][$i],
-                    'size'     => $_FILES['images']['size'][$i],
-                ];
+                if (!empty($name)) {
+                    $files[] = [
+                        'name'     => $name,
+                        'type'     => $_FILES['images']['type'][$i],
+                        'tmp_name' => $_FILES['images']['tmp_name'][$i],
+                        'error'    => $_FILES['images']['error'][$i],
+                        'size'     => $_FILES['images']['size'][$i],
+                    ];
+                }
             }
         } elseif (!empty($_FILES['image']['name'])) {
             $files[] = $_FILES['image'];
         }
-
-        $maxOrder = $this->model->maxOrder($projectId);
 
         foreach ($files as $idx => $file) {
             $upload = FileUpload::uploadImage($file);
@@ -71,6 +71,26 @@ class GalleryController {
                 'sort_order'  => ++$maxOrder,
             ]);
             $created[] = $this->model->findById($id);
+        }
+
+        // 2. Support online URLs: image_url (can be string or array)
+        if (!empty($_POST['image_url'])) {
+            $urls = (array)$_POST['image_url'];
+            foreach ($urls as $idx => $url) {
+                if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                    $errors[] = "URL[$idx]: URL tidak valid";
+                    continue;
+                }
+                
+                $id = $this->model->create([
+                    'project_id'  => $projectId,
+                    'image'       => $url,
+                    'title'       => null,
+                    'description' => null,
+                    'sort_order'  => ++$maxOrder,
+                ]);
+                $created[] = $this->model->findById($id);
+            }
         }
 
         if (empty($created) && !empty($errors)) {

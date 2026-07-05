@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base URL of the PHP API
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost/kp-api/public';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost/kp/kp-api/public';
 
 const api = axios.create({
   baseURL: API_BASE,

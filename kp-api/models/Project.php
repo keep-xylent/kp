@@ -15,7 +15,7 @@ class Project {
         $where  = ['1=1'];
         $params = [];
 
-        if (!empty($filters['status'])) {
+        if (!empty($filters['status']) && $filters['status'] !== 'all') {
             $where[]           = 'p.status = :status';
             $params[':status'] = $filters['status'];
         }

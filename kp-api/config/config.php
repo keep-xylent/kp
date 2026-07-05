@@ -10,7 +10,7 @@ define('DB_PASS', '');
 define('DB_NAME', 'company_profile');
 
 // Base URL of this API (adjust to your Laragon domain/alias)
-define('API_BASE_URL', 'http://localhost/kp-api/public');
+define('API_BASE_URL', 'http://localhost/kp/kp-api/public');
 
 // Upload directory (absolute path)
 define('UPLOAD_DIR', dirname(__DIR__) . '/public/uploads/gallery/');

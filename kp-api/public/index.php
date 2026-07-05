@@ -92,10 +92,13 @@ try {
     // ── Users ─────────────────────────────────────────────────
     } elseif ($method === 'POST' && matchRoute('/api/login', $path, $params)) {
         (new UserController())->login();
-    } elseif ($method === 'GET' && matchRoute('/api/users/{id}', $path, $params)) {
-        (new UserController())->show((int)$params[0]);
-    } elseif ($method === 'GET' && matchRoute('/api/users', $path, $params)) {
-        (new UserController())->index();
+
+
+    // ── Settings ──────────────────────────────────────────────
+    } elseif ($method === 'GET' && matchRoute('/api/settings', $path, $params)) {
+        (new SettingController())->index();
+    } elseif (($method === 'POST' || $method === 'PUT') && matchRoute('/api/settings', $path, $params)) {
+        (new SettingController())->update();
 
     // ── 404 ───────────────────────────────────────────────────
     } else {
