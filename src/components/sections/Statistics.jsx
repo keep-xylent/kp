@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getSettings } from '../api/settings';
+import { getSettings } from '../../api/settings';
 
 const Counter = ({ target, suffix = '+' }) => {
   const [count, setCount] = useState(0);

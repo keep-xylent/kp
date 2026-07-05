@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { MapPin, Calendar, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { useProjects } from '../hooks/useProjects';
+import { useProjects } from '../../hooks/useProjects';
 
 export default function Portofolio({ onViewDetail }) {
   const { projects, categories, loading, error, refetch } = useProjects({ status: 'active' });

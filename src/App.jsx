@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import './index.css';
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import Tentang from './components/Tentang';
-import Layanan from './components/Layanan';
-import Statistics from './components/Statistics';
-import Portofolio from './components/Portofolio';
-import Sertifikasi from './components/Sertifikasi';
-import Kontak from './components/Kontak';
-import Footer from './components/Footer';
-import ProjectDetail from './components/ProjectDetail';
-import AdminDashboard from './components/AdminDashboard';
+import Navbar from './components/layout/Navbar';
+import Hero from './components/sections/Hero';
+import Tentang from './components/sections/Tentang';
+import Layanan from './components/sections/Layanan';
+import Statistics from './components/sections/Statistics';
+import Portofolio from './components/sections/Portofolio';
+import Sertifikasi from './components/sections/Sertifikasi';
+import Kontak from './components/sections/Kontak';
+import Footer from './components/layout/Footer';
+import ProjectDetail from './pages/ProjectDetail';
+import AdminDashboard from './pages/AdminDashboard';
 import { getSettings } from './api/settings';
 
 function App() {

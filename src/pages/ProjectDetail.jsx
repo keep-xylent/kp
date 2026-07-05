@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useProjectDetail } from '../hooks/useProjectDetail';
-import Lightbox from './ui/Lightbox';
+import Lightbox from '../components/ui/Lightbox';
 import { MapPin, Calendar, Tag, ArrowLeft, Loader2, AlertCircle, Images } from 'lucide-react';
 
 /**
