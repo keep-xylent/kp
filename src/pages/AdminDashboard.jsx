@@ -21,6 +21,7 @@ import SettingsTab from '../components/admin/SettingsTab';
 import ProjectsTab from '../components/admin/ProjectsTab';
 import ProjectFormModal from '../components/admin/ProjectFormModal';
 import GalleryView from '../components/admin/GalleryView';
+import ConfirmModal from '../components/admin/ConfirmModal';
 
 export default function AdminDashboard({ onExit }) {
   // Authentication State
@@ -61,6 +62,7 @@ export default function AdminDashboard({ onExit }) {
 
   // General Dashboard State
   const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'settings'
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -107,6 +109,26 @@ export default function AdminDashboard({ onExit }) {
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
 
+  // Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const showConfirm = (title, message, onConfirm) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm
+    });
+  };
+
+  const hideConfirm = () => {
+    setConfirmModal({ ...confirmModal, isOpen: false });
+  };
 
   // Autoload data on mount/tab change
   useEffect(() => {
@@ -236,16 +258,20 @@ export default function AdminDashboard({ onExit }) {
     }
   };
 
-  const handleProjectDelete = async (id) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus proyek ini? Seluruh gambar galeri proyek juga akan terhapus secara permanen.')) {
-      try {
-        await deleteProject(id);
-        showSuccess('Proyek berhasil dihapus');
-        fetchData();
-      } catch (err) {
-        showError(err.message || 'Gagal menghapus proyek');
+  const handleProjectDelete = (id) => {
+    showConfirm(
+      'Hapus Proyek',
+      'Apakah Anda yakin ingin menghapus proyek ini? Seluruh gambar galeri proyek juga akan terhapus secara permanen.',
+      async () => {
+        try {
+          await deleteProject(id);
+          showSuccess('Proyek berhasil dihapus');
+          fetchData();
+        } catch (err) {
+          showError(err.message || 'Gagal menghapus proyek');
+        }
       }
-    }
+    );
   };
 
   /* ── 3. Category CRUD Handlers ── */
@@ -269,16 +295,20 @@ export default function AdminDashboard({ onExit }) {
     }
   };
 
-  const handleCategoryDelete = async (id) => {
-    if (window.confirm('Hapus kategori ini? Proyek dengan kategori ini akan dibatasi.')) {
-      try {
-        await deleteCategory(id);
-        showSuccess('Kategori berhasil dihapus');
-        fetchData();
-      } catch (err) {
-        showError(err.message || 'Gagal menghapus kategori');
+  const handleCategoryDelete = (id) => {
+    showConfirm(
+      'Hapus Kategori',
+      'Hapus kategori ini? Proyek dengan kategori ini akan dibatasi.',
+      async () => {
+        try {
+          await deleteCategory(id);
+          showSuccess('Kategori berhasil dihapus');
+          fetchData();
+        } catch (err) {
+          showError(err.message || 'Gagal menghapus kategori');
+        }
       }
-    }
+    );
   };
 
   /* ── 5. Gallery Manager Handlers ── */
@@ -338,21 +368,25 @@ export default function AdminDashboard({ onExit }) {
     }
   };
 
-  const handleGalleryItemDelete = async (id) => {
-    if (window.confirm('Hapus foto ini dari galeri? File asli akan dihapus dari server.')) {
-      setGalleryLoading(true);
-      try {
-        await deleteGalleryItem(id);
-        showSuccess('Foto berhasil dihapus');
-        
-        const items = await getProjectGallery(activeGalleryProject.id);
-        setGalleryItems(items || []);
-      } catch (err) {
-        showError(err.message || 'Gagal menghapus foto');
-      } finally {
-        setGalleryLoading(false);
+  const handleGalleryItemDelete = (id) => {
+    showConfirm(
+      'Hapus Foto',
+      'Hapus foto ini dari galeri? File asli akan dihapus dari server.',
+      async () => {
+        setGalleryLoading(true);
+        try {
+          await deleteGalleryItem(id);
+          showSuccess('Foto berhasil dihapus');
+          
+          const items = await getProjectGallery(activeGalleryProject.id);
+          setGalleryItems(items || []);
+        } catch (err) {
+          showError(err.message || 'Gagal menghapus foto');
+        } finally {
+          setGalleryLoading(false);
+        }
       }
-    }
+    );
   };
 
   const handleGalleryItemUpdate = async (id, data) => {
@@ -455,16 +489,28 @@ export default function AdminDashboard({ onExit }) {
         toggleDarkMode={toggleDarkMode}
         isDarkMode={isDarkMode}
         handleLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
       />
 
       {/* Main Container */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-20 md:hidden" 
+            onClick={() => setIsSidebarOpen(false)}
+          ></div>
+        )}
+
         <AdminSidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           activeGalleryProject={activeGalleryProject}
           setActiveGalleryProject={setActiveGalleryProject}
           onExit={onExit}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
         />
 
         {/* Workspace Content */}
@@ -556,6 +602,14 @@ export default function AdminDashboard({ onExit }) {
         setProjectThumbnail={setProjectThumbnail}
         handleThumbnailChange={handleThumbnailChange}
         formLoading={formLoading}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={hideConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
       />
     </div>
   );
