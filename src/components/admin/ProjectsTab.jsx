@@ -49,8 +49,8 @@ export default function ProjectsTab({
             <p className="text-xs font-medium mt-2">Menyinkronkan data proyek…</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left border-collapse">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900/50">
                   <th className="p-4 pl-6">Proyek</th>
@@ -190,8 +190,8 @@ export default function ProjectsTab({
           </div>
 
           {/* Categories list */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left border-collapse">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[400px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900/50">
                   <th className="p-4 pl-6">Kategori</th>

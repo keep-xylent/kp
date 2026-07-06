@@ -69,8 +69,8 @@ export default function Statistics() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         {statsData && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-            {statsData.map((item) => (
-              <div key={item.label} className="text-center reveal">
+            {statsData.map((item, index) => (
+              <div key={item.label} className="text-center" style={{ animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both` }}>
                 <div className="text-4xl sm:text-5xl font-heading font-bold text-white mb-2">
                   <Counter target={item.target} suffix={item.suffix} />
                 </div>

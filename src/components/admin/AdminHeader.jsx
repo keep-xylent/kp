@@ -1,10 +1,16 @@
 import React from 'react';
-import { Sun, Moon, LogOut } from 'lucide-react';
+import { Sun, Moon, LogOut, Menu } from 'lucide-react';
 
-export default function AdminHeader({ toggleDarkMode, isDarkMode, handleLogout }) {
+export default function AdminHeader({ toggleDarkMode, isDarkMode, handleLogout, isSidebarOpen, setIsSidebarOpen }) {
   return (
-    <header className="h-16 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 flex items-center justify-between z-10 transition-colors">
+    <header className="h-16 flex-shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between z-10 transition-colors">
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="md:hidden p-2 -ml-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <div className="flex items-center space-x-2">
           <img src="/images/logo_dark.png" alt="Logo" className="h-7 dark:hidden" />
           <img src="/images/logo_light.png" alt="Logo" className="h-7 hidden dark:block" />
